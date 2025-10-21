@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 
 
-def process_audio_files(dataset_path='data/procesados', output_dir='results'):
+def process_audio_files(dataset_path='procesados', output_dir='results'):
     dataset_path = Path(dataset_path)
     output_dir = Path(output_dir)
     output_dir.mkdir(exist_ok=True)
