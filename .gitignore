@@ -3,3 +3,5 @@ __pycache__/
 not_ready/
 data/
 models/
+**.keras
+**.pkl
