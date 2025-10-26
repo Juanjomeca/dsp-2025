@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from keras.models import Sequential, Model
-from keras.layers import Conv2D, MaxPooling2D, Dense, Flatten, Dropout
+from keras.layers import Conv2D, MaxPooling2D, Dense, Flatten, Dropout, Input
 from keras.optimizers import Adam
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, accuracy_score
@@ -9,12 +9,14 @@ from sklearn.model_selection import GridSearchCV
 import time
 import joblib
 from utils import (load_data, setup_callbacks, display_sample_images,
-                  plot_training_history, evaluate_model, show_predictions)
+                   plot_training_history, evaluate_model, show_predictions)
+
 
 def create_cnn_model():
     """Crea CNN completa para pre-entrenar y luego extraer características"""
     model = Sequential([
-        Conv2D(32, (3, 3), activation='relu', input_shape=(28, 28, 1)),
+        Input(shape=(28, 28, 1)),
+        Conv2D(32, (3, 3), activation='relu'),
         MaxPooling2D((2, 2)),
         Conv2D(64, (3, 3), activation='relu'),
         MaxPooling2D((2, 2)),
@@ -32,12 +34,40 @@ def create_cnn_model():
     )
     return model
 
+
+def create_cnn_model_functional():
+    """Crea CNN completa (versión funcional) para pre-entrenar y luego extraer características"""
+
+    inputs = Input(shape=(28, 28, 1))
+
+    x = Conv2D(32, (3, 3), activation='relu')(inputs)
+    x = MaxPooling2D((2, 2))(x)
+    x = Conv2D(64, (3, 3), activation='relu')(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Conv2D(64, (3, 3), activation='relu')(x)
+    x = Flatten()(x)
+    x = Dense(64, activation='relu')(x)
+    x = Dropout(0.5)(x)
+    outputs = Dense(10, activation='softmax')(x)
+
+    model = Model(inputs=inputs, outputs=outputs)
+
+    model.compile(
+        optimizer=Adam(learning_rate=0.001),
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
+
+    return model
+
+
 def train_cnn_backbone(model, train_data, val_data, epochs=10):
     """Pre-entrena la CNN completa"""
     train_images, train_labels = train_data
     val_images, val_labels = val_data
 
-    callbacks = setup_callbacks('val_loss', patience=5, min_delta=0.001, prefix='cnn_backbone')
+    callbacks = setup_callbacks(
+        'val_loss', patience=5, min_delta=0.001, prefix='cnn_backbone')
 
     history = model.fit(
         train_images, train_labels,
@@ -47,21 +77,29 @@ def train_cnn_backbone(model, train_data, val_data, epochs=10):
     )
     return history
 
+
 def extract_features(cnn_model, images):
-    """Extrae características usando la CNN pre-entrenada"""
-    # Método más simple: usar predict hasta la capa Dense
-    # Hacemos forward pass hasta antes del Dropout
-    temp_output = images
+    """Extrae características usando la CNN pre-entrenada (simplificado)"""
+    feature_extractor = Model(inputs=cnn_model.inputs,
+                              outputs=cnn_model.layers[-3].output)
+    features = feature_extractor.predict(images, verbose=0)
+    return features
 
-    # Procesar a través de cada capa excepto las últimas 2 (Dropout y Dense final)
-    for layer in cnn_model.layers[:-2]:
-        temp_output = layer(temp_output)
 
-    return temp_output.numpy() if hasattr(temp_output, 'numpy') else temp_output
+def train_basic_svm_classifier(features, labels):
+    """Entrena clasificador SVM con parámetros por defecto"""
+    labels_numeric = np.argmax(labels, axis=1) if len(
+        labels.shape) > 1 else labels
+
+    svm = SVC()
+    svm.fit(features, labels_numeric)
+    return svm
+
 
 def train_svm_classifier(features, labels, use_grid_search=False):
     """Entrena clasificador SVM con las características extraídas"""
-    labels_numeric = np.argmax(labels, axis=1) if len(labels.shape) > 1 else labels
+    labels_numeric = np.argmax(labels, axis=1) if len(
+        labels.shape) > 1 else labels
 
     if use_grid_search:
         param_grid = {
@@ -79,12 +117,14 @@ def train_svm_classifier(features, labels, use_grid_search=False):
         svm.fit(features, labels_numeric)
         return svm
 
+
 def evaluate_and_compare_models(cnn_model, svm_model, test_images, test_labels):
     """Evalúa y compara CNN pura vs CNN-SVM"""
     # Evaluar CNN pura
     print("Evaluando CNN pura:")
     cnn_predictions = evaluate_model(cnn_model, test_images, test_labels)
-    cnn_accuracy = accuracy_score(np.argmax(test_labels, axis=1), np.argmax(cnn_predictions, axis=1))
+    cnn_accuracy = accuracy_score(
+        np.argmax(test_labels, axis=1), np.argmax(cnn_predictions, axis=1))
 
     # Evaluar CNN-SVM
     print("\nEvaluando CNN-SVM:")
@@ -103,6 +143,7 @@ def evaluate_and_compare_models(cnn_model, svm_model, test_images, test_labels):
     print(f"Diferencia:   {svm_accuracy - cnn_accuracy:+.4f}")
 
     return cnn_accuracy, svm_accuracy
+
 
 def show_sample_predictions_cnn_svm(cnn_model, svm_model, test_images, test_labels, num_samples=10):
     """Muestra predicciones de muestra del modelo CNN-SVM"""
@@ -125,6 +166,7 @@ def show_sample_predictions_cnn_svm(cnn_model, svm_model, test_images, test_labe
     plt.tight_layout()
     plt.show()
 
+
 def main():
     """Función principal simplificada"""
     print("MODELO HÍBRIDO CNN-SVM PARA MNIST")
@@ -136,11 +178,12 @@ def main():
 
     # 2. Crear y entrenar CNN
     print("\nCreando y entrenando CNN...")
-    cnn_model = create_cnn_model()
+    cnn_model = create_cnn_model_functional()
     cnn_model.summary()
 
     start_time = time.time()
-    history = train_cnn_backbone(cnn_model, (train_images, train_labels), (test_images, test_labels))
+    history = train_cnn_backbone(
+        cnn_model, (train_images, train_labels), (test_images, test_labels))
     cnn_training_time = time.time() - start_time
     plot_training_history(history)
 
@@ -150,16 +193,18 @@ def main():
     test_features = extract_features(cnn_model, test_images)
     feature_time = time.time() - start_time
 
-    # 4. Entrenar SVM
+    # 4. Entrenar SVM con parámetros por defecto
     start_time = time.time()
-    svm_model = train_svm_classifier(train_features, train_labels, use_grid_search=True)
+    svm_model = train_svm_classifier(train_features, train_labels)
     svm_training_time = time.time() - start_time
 
     # 5. Evaluar y comparar modelos
-    cnn_accuracy, svm_accuracy = evaluate_and_compare_models(cnn_model, svm_model, test_images, test_labels)
+    cnn_accuracy, svm_accuracy = evaluate_and_compare_models(
+        cnn_model, svm_model, test_images, test_labels)
 
     # 6. Mostrar predicciones
-    show_sample_predictions_cnn_svm(cnn_model, svm_model, test_images, test_labels)
+    show_sample_predictions_cnn_svm(
+        cnn_model, svm_model, test_images, test_labels)
     show_predictions(cnn_model, test_images, test_labels)
 
     # 7. Resumen final
@@ -174,6 +219,7 @@ def main():
     cnn_model.save('cnn_feature_extractor.keras')
     joblib.dump(svm_model, 'svm_classifier.pkl')
     print("Modelos guardados: cnn_feature_extractor.keras, svm_classifier.pkl")
+
 
 if __name__ == "__main__":
     main()

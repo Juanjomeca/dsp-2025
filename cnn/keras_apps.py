@@ -27,7 +27,7 @@ def adapt_mnist_for_vgg():
 def train_vgg_transfer_learning():
     train_images, train_labels, test_images, test_labels = adapt_mnist_for_vgg()
 
-    # Convertir labels si es necesario
+    # Convertir labels ai estan en formato one hot
     if len(train_labels.shape) > 1:
         train_labels_num = np.argmax(train_labels, axis=1)
         test_labels_num = np.argmax(test_labels, axis=1)
