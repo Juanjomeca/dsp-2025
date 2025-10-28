@@ -178,7 +178,7 @@ def main():
 
     # 2. Crear y entrenar CNN
     print("\nCreando y entrenando CNN...")
-    cnn_model = create_cnn_model_functional()
+    cnn_model = create_cnn_model()
     cnn_model.summary()
 
     start_time = time.time()
