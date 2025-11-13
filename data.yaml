@@ -1,0 +1,7 @@
+# train: ./datasets/project-tubers-dataset/images
+train: ./datasets/tubers/images/train
+# val: ./datasets/project-tubers-dataset/images
+val: ./datasets/tubers/images/val
+
+nc: 4
+names: ["Coin", "Mashua", "Oca", "Olluco"]
