@@ -17,3 +17,4 @@ keras
 tensorflow
 label-studio
 ultralytics
+opencv-contrib-python
